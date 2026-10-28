@@ -1,2 +1,2 @@
-# snowhale.github.io
+# snowhales.github.io
 my github homepage
