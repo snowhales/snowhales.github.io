@@ -14,10 +14,18 @@
             color: #333;
             text-align: center;
         }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: url('snowhale-bg.jpg') center / cover no-repeat;
+            opacity: 0.3;
+        }
         .container {
             max-width: 800px;
             margin: auto;
-            background: #fff;
+            background: rgba(255, 255, 255, 0.55);
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
@@ -30,6 +38,17 @@
             margin-bottom: 15px;
             font-size: 1.1em;
         }
+        .night-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 22px;
+            border-radius: 999px;
+            background: #0b1630;
+            color: #fff;
+            text-decoration: none;
+        }
+        .night-link:hover { background: #1d3b66; }
+        .night-link:focus-visible { outline: 3px solid #007bff; outline-offset: 3px; }
         img {
             max-width: 100%;
             height: auto;
@@ -61,6 +80,7 @@
         <p>그날 이후, 아이는 눈이 내릴 때마다</p>
         <p>하늘을 올려다보며 속삭였다.</p>
         <p>“고마워, 눈고래.”</p>
+        <a class="night-link" href="night.html">눈 내리는 밤, 눈고래를 만나러 가기 →</a>
         <img src="snowhale.png" alt="눈고래의 바다 이미지">
     </div>
 </body>
