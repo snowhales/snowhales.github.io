@@ -84,6 +84,18 @@ function spawn(x, y, n, speed, g, up) {
   }
 }
 
+const rings = [];
+function splash(x, sp) {
+  const n = Math.min(90, Math.round(12 + sp * 3.2));
+  for (let i = 0; i < n; i++) {
+    const a = rand(-2.7, -.45), v = rand(.35, 1) * sp * .55 + 1.5;
+    parts.push({ x: x + rand(-18, 18), y: seaY(), vx: Math.cos(a) * v * .8, vy: Math.sin(a) * v,
+      g: .22, life: Math.round(rand(40, 70)), r: rand(1.4, 3.6) });
+  }
+  const k = Math.min(4, 1 + Math.floor(sp / 6));
+  for (let i = 0; i < k; i++) rings.push({ x: x, r: -i * 14, a: .8, v: 1.6 + sp * .08 });
+}
+
 function frame() {
   t += .016;
   const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -99,28 +111,62 @@ function frame() {
   whale.x += whale.dir * whale.speed;
   if (whale.x > W - 100) whale.dir = -1;
   if (whale.x < 100) whale.dir = 1;
-  if (whale.jump > 0 || whale.vj > 0) {
-    whale.jump += whale.vj; whale.vj -= .6;
-    const maxJ = seaY() - 60;
+  if (whale.jump !== 0 || whale.vj !== 0) {
+    const prev = whale.jump;
+    if (whale.jump > 0) {
+      whale.vj -= .6;                                   // 공중: 중력
+    } else {
+      whale.vj += -whale.jump * .02; whale.vj *= .95;   // 물속: 부력 + 물의 저항
+    }
+    whale.jump += whale.vj;
+
+    const maxJ = seaY() - 60;                           // 화면 위로 못 나가게
     if (whale.jump > maxJ) { whale.jump = maxJ; whale.vj = Math.min(whale.vj, 0); }
-    if (whale.jump > 40 && !reduce) {
+    const maxD = Math.min(H * .15, 140);                // 바닥 아래로 못 내려가게
+    if (whale.jump < -maxD) { whale.jump = -maxD; whale.vj = Math.max(whale.vj, 0); }
+
+    if (prev > 0 && whale.jump <= 0) {                  // 입수: 속도에 따라 물보라와 깊이가 달라짐
+      const impact = -whale.vj;
+      if (impact > 2) splash(whale.x, impact);
+      whale.vj *= .9;
+    } else if (prev <= 0 && whale.jump > 0 && whale.vj > 2) {   // 출수
+      splash(whale.x, whale.vj * .7);
+    }
+    if (whale.jump < -15 && !reduce && Math.random() < .12) {   // 물속 거품
+      parts.push({ x: whale.x + rand(-40, 40), y: whaleY() + rand(-10, 10), vx: rand(-.2, .2),
+        vy: rand(-1.6, -.8), g: 0, life: 70, r: rand(1.5, 3.2), b: true });
+    }
+    if (whale.jump > 40 && !reduce) {                   // 공중 꼬리 반짝임
       parts.push({ x: whale.x - whale.dir * 70, y: whaleY(), vx: rand(-.3, .3), vy: rand(-.2, .4),
         g: .01, life: 45, r: rand(1.5, 3.5) });
     }
-    if (whale.jump <= 0) { whale.jump = 0; whale.vj = 0; spawn(whale.x, seaY(), 18, 3, .12, false); }
+    if (whale.jump <= 0 && Math.abs(whale.jump) < .4 && Math.abs(whale.vj) < .3) {
+      whale.jump = 0; whale.vj = 0;                     // 잔잔해지면 수면에 정지
+    }
   }
   drawWhale();
 
-  ctx.fillStyle = '#7fa6d9'; ctx.beginPath(); ctx.moveTo(0, H);
+  const sg = ctx.createLinearGradient(0, seaY(), 0, H);
+  sg.addColorStop(0, 'rgba(140,182,232,.8)'); sg.addColorStop(1, 'rgba(36,76,138,.9)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.moveTo(0, H);
   for (let x = 0; x <= W; x += 20) ctx.lineTo(x, seaY() + Math.sin(x * .012 + t * 1.2) * 6);
   ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const r = rings[i]; r.r += r.v; r.a -= .012;
+    if (r.a <= 0) { rings.splice(i, 1); continue; }
+    if (r.r <= 0) continue;
+    ctx.strokeStyle = 'rgba(255,255,255,' + r.a + ')'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(r.x, seaY(), r.r, r.r * .16, 0, 0, 6.283); ctx.stroke();
+  }
 
   if (whale.sayT > 0) { whale.sayT--; bubble(whale.say, whale.x, whaleY() - 60); }
 
   ctx.fillStyle = '#fff';
   for (const p of parts) {
     p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life--;
-    ctx.globalAlpha = Math.max(0, p.life / 60);
+    if (p.b && p.y < seaY()) p.life = 0;   // 거품은 수면에서 터짐
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life / 60));
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
   }
   for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) parts.splice(i, 1);
@@ -141,7 +187,7 @@ cv.addEventListener('pointerdown', e => {
   const dx = e.clientX - whale.x, dy = e.clientY - whaleY();
   if (Math.hypot(dx, dy) < 100) {
     whale.vj = 10.5;                      // 지금 높이에서 다시 한 번 솟구침
-    if (whale.jump <= 0) whale.jump = 1;  // 물 위에서 시작할 때만 띄우기
+    if (whale.jump === 0) whale.jump = 1;  // 수면에서 시작할 때만 띄움
     whale.say = lines[whale.n++ % lines.length]; whale.sayT = 170;
     spawn(whale.x + whale.dir * 60, whaleY() - 20, whale.jump > 40 ? 14 : 28, 0, .18, true);
   } else {
