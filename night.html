@@ -17,7 +17,7 @@
 </head>
 <body>
 <canvas id="c" role="img" aria-label="눈이 내리는 밤바다에서 헤엄치는 하얀 고래. 고래를 누르면 뛰어오르며 말을 건넵니다."></canvas>
-<div class="hint">고래를 눌러 보세요 · 빈 곳을 누르면 눈이 쏟아져요</div>
+<div class="hint">고래를 눌러 보세요 · 공중에서 연달아 누르면 하늘을 날아요 · 빈 곳을 누르면 눈이 쏟아져요</div>
 <a class="back" href="./">← 눈고래의 바다</a>
 <script>
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
@@ -101,6 +101,12 @@ function frame() {
   if (whale.x < 100) whale.dir = 1;
   if (whale.jump > 0 || whale.vj > 0) {
     whale.jump += whale.vj; whale.vj -= .6;
+    const maxJ = seaY() - 60;
+    if (whale.jump > maxJ) { whale.jump = maxJ; whale.vj = Math.min(whale.vj, 0); }
+    if (whale.jump > 40 && !reduce) {
+      parts.push({ x: whale.x - whale.dir * 70, y: whaleY(), vx: rand(-.3, .3), vy: rand(-.2, .4),
+        g: .01, life: 45, r: rand(1.5, 3.5) });
+    }
     if (whale.jump <= 0) { whale.jump = 0; whale.vj = 0; spawn(whale.x, seaY(), 18, 3, .12, false); }
   }
   drawWhale();
@@ -134,9 +140,10 @@ addEventListener('pointermove', e => { wind = (e.clientX / W - .5) * 1.6; });
 cv.addEventListener('pointerdown', e => {
   const dx = e.clientX - whale.x, dy = e.clientY - whaleY();
   if (Math.hypot(dx, dy) < 100) {
-    whale.vj = 11; whale.jump = 1;
+    whale.vj = 10.5;                      // 지금 높이에서 다시 한 번 솟구침
+    if (whale.jump <= 0) whale.jump = 1;  // 물 위에서 시작할 때만 띄우기
     whale.say = lines[whale.n++ % lines.length]; whale.sayT = 170;
-    spawn(whale.x + whale.dir * 60, whaleY() - 20, 28, 0, .18, true);
+    spawn(whale.x + whale.dir * 60, whaleY() - 20, whale.jump > 40 ? 14 : 28, 0, .18, true);
   } else {
     spawn(e.clientX, e.clientY, 40, 4, .05, false);
     for (const f of flakes.slice(0, 25)) { f.x = e.clientX + rand(-120, 120); f.y = rand(-80, 0); }
