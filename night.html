@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>눈고래와 눈 내리는 밤</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1630;
+    font-family: 'Malgun Gothic', system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 100%; cursor: pointer; touch-action: manipulation; }
+  .hint { position: fixed; left: 0; right: 0; top: 14px; text-align: center; color: #d6e6ff;
+    font-size: .95rem; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+  .back { position: fixed; left: 14px; bottom: 12px; color: #0b1630; font-size: .9rem;
+    background: rgba(255,255,255,.85); padding: 4px 10px; border-radius: 999px; text-decoration: none; }
+  .back:focus-visible { outline: 3px solid #0b1630; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<canvas id="c" role="img" aria-label="눈이 내리는 밤바다에서 헤엄치는 하얀 고래. 고래를 누르면 뛰어오르며 말을 건넵니다."></canvas>
+<div class="hint">고래를 눌러 보세요 · 빈 곳을 누르면 눈이 쏟아져요</div>
+<a class="back" href="./">← 눈고래의 바다</a>
+<script>
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let W, H;
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+const rand = (a, b) => a + Math.random() * (b - a);
+let wind = 0, t = 0;
+const flakes = Array.from({ length: reduce ? 60 : 170 }, () =>
+  ({ x: rand(0, W), y: rand(0, H), r: rand(1, 3.2), v: rand(.4, 1.4), p: rand(0, 6.28) }));
+const stars = Array.from({ length: 70 }, () =>
+  ({ x: rand(0, 1), y: rand(0, .6), r: rand(.4, 1.4), p: rand(0, 6.28) }));
+const parts = [];
+const whale = { x: W * .3, dir: 1, speed: reduce ? .25 : .7, jump: 0, vj: 0, say: '', sayT: 0, n: 0 };
+const lines = ['너는 울지 않는구나.', '눈은 슬픔을 감싸 안는 법을 알고 있어.',
+  '별들에게 인사하러 가 볼까?', '눈송이를 등에 싣고 내려가자.', '고마워 — 오늘도 눈이 와서.'];
+
+const seaY = () => H * .8;
+const whaleY = () => seaY() - 6 + Math.sin(t * 1.5) * 5 - whale.jump;
+
+function drawWhale() {
+  ctx.save();
+  ctx.translate(whale.x, whaleY());
+  ctx.scale(whale.dir, 1);
+  ctx.rotate(-whale.vj * .03);
+  ctx.fillStyle = '#f5faff'; ctx.strokeStyle = '#b9d3f5'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-55, 0);
+  ctx.bezierCurveTo(-45, -28, 30, -36, 66, -8);
+  ctx.bezierCurveTo(78, 2, 70, 18, 44, 22);
+  ctx.bezierCurveTo(10, 30, -40, 22, -55, 0);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-50, -3);
+  ctx.quadraticCurveTo(-72, -4, -80, -26); ctx.quadraticCurveTo(-92, -14, -86, 0);
+  ctx.quadraticCurveTo(-92, 14, -80, 26); ctx.quadraticCurveTo(-72, 4, -50, 3);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#1d3b66'; ctx.beginPath(); ctx.arc(48, -2, 2.6, 0, 6.283); ctx.fill();
+  ctx.restore();
+}
+
+function bubble(text, x, y) {
+  ctx.font = '15px "Malgun Gothic", sans-serif';
+  const w = ctx.measureText(text).width + 24, h = 30;
+  const bx = Math.max(8, Math.min(W - w - 8, x - w / 2)), by = y - h;
+  ctx.fillStyle = 'rgba(255,255,255,.95)';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(bx, by, w, h, 12); else ctx.rect(bx, by, w, h);
+  ctx.fill();
+  ctx.fillStyle = '#0b1630'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, bx + 12, by + h / 2 + 1);
+}
+
+function spawn(x, y, n, speed, g, up) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, 6.283), s = rand(.5, speed);
+    parts.push({ x, y, vx: up ? rand(-1.3, 1.3) : Math.cos(a) * s,
+      vy: up ? rand(-6.5, -3) : Math.sin(a) * s, g, life: 60, r: rand(1.5, 3) });
+  }
+}
+
+function frame() {
+  t += .016;
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#0b1630'); g.addColorStop(1, '#1d3b66');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#fff';
+  for (const s of stars) {
+    ctx.globalAlpha = .5 + .5 * Math.sin(t * 2 + s.p);
+    ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 6.283); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  whale.x += whale.dir * whale.speed;
+  if (whale.x > W - 100) whale.dir = -1;
+  if (whale.x < 100) whale.dir = 1;
+  if (whale.jump > 0 || whale.vj > 0) {
+    whale.jump += whale.vj; whale.vj -= .6;
+    if (whale.jump <= 0) { whale.jump = 0; whale.vj = 0; spawn(whale.x, seaY(), 18, 3, .12, false); }
+  }
+  drawWhale();
+
+  ctx.fillStyle = '#7fa6d9'; ctx.beginPath(); ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 20) ctx.lineTo(x, seaY() + Math.sin(x * .012 + t * 1.2) * 6);
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+
+  if (whale.sayT > 0) { whale.sayT--; bubble(whale.say, whale.x, whaleY() - 60); }
+
+  ctx.fillStyle = '#fff';
+  for (const p of parts) {
+    p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life--;
+    ctx.globalAlpha = Math.max(0, p.life / 60);
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
+  }
+  for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) parts.splice(i, 1);
+
+  ctx.globalAlpha = .85;
+  for (const f of flakes) {
+    f.y += f.v; f.x += Math.sin(t + f.p) * .4 + wind;
+    if (f.y > H + 5) { f.y = -5; f.x = rand(0, W); }
+    if (f.x < -5) f.x = W + 5; else if (f.x > W + 5) f.x = -5;
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.283); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(frame);
+}
+
+addEventListener('pointermove', e => { wind = (e.clientX / W - .5) * 1.6; });
+cv.addEventListener('pointerdown', e => {
+  const dx = e.clientX - whale.x, dy = e.clientY - whaleY();
+  if (Math.hypot(dx, dy) < 100) {
+    whale.vj = 11; whale.jump = 1;
+    whale.say = lines[whale.n++ % lines.length]; whale.sayT = 170;
+    spawn(whale.x + whale.dir * 60, whaleY() - 20, 28, 0, .18, true);
+  } else {
+    spawn(e.clientX, e.clientY, 40, 4, .05, false);
+    for (const f of flakes.slice(0, 25)) { f.x = e.clientX + rand(-120, 120); f.y = rand(-80, 0); }
+  }
+});
+frame();
+</script>
+</body>
+</html>
